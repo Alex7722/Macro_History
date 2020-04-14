@@ -215,7 +215,14 @@ BE_extended[,share_of_discipline:=disciplines_by_year/articles_by_year]
 #### PART II : Plotting our corpus and extended corpus ####
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
-
+######################### Graph **********************
+ggplot(BE_extended[,.(.N), .(Annee_Bibliographique)][order(N)]
+       , aes(x=Annee_Bibliographique, y=N)) +
+  geom_smooth(method="auto", se=FALSE, fullrange=FALSE, level=0.95, span = 0.3)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
+  scale_x_continuous("Years", limits = c(1970, 2018)) +
+  scale_y_continuous("Number of Articles")
+ggsave("Graphs/Corpus2.png", width=286, height=215, units = "mm")
 
 
 
@@ -461,6 +468,109 @@ rm(all_ref_temp)
 gc()
 
 
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#### Coupling ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+all_ref_temp <-  dbGetQuery(ESH, paste0("SELECT Annee, Nom, ID_Art, New_id2 
+                                        FROM OST_Expanded_SciHum.References7 WHERE New_id2!=0;")) %>%  data.table
+
+
+######################### Coupling it (in progress) ***************************
+coupling_base <- all_ref_temp[ID_Art %in% BE_extended$ID_Art] %>%  data.table
+coupling_base <- coupling_base[ID_Art!=New_id2]
+coupling_base <-coupling_base[, head(.SD, 1), .(ID_Art,New_id2)]
+coupling_base <- coupling_base[,.(ID_Art,New_id2)]
+coupling_base <- merge(coupling_base, BE_extended[,.(ID_Art, Annee_Bibliographique)], by = "ID_Art", all.x = TRUE, all.y = FALSE)
+coupling_base <-  coupling_base[,nb_ref2 :=.N,by=ID_Art][nb_ref2>1][,nb_ref2:=NULL]
+coupling_base <-  coupling_base[,nb_ref2 :=.N,by=New_id2][nb_ref2>1][,nb_ref2:=NULL]
+
+coupling_base[,.N,.(ID_Art, New_id2)][order(N)]
+coupling_base[New_id2<2]
+
+
+
+
+#Getting Edges
+coupling_newiD2_edges <- function(x, y ### x=df of corpus, y=minimum number of connections
+){
+  cocitation_edgesf <- x[,.(ID_Art, New_id2)]
+  setkey(cocitation_edgesf, New_id2, ID_Art)
+  
+  cocitation_edgesf <-  cocitation_edgesf[,nb_ref2 :=.N,by=New_id2][nb_ref2>1][,nb_ref2:=NULL]
+  # creating all links between cocited docs
+  cocitation_edgesf <- cocitation_edgesf[,list(Target = rep(ID_Art[1:(length(ID_Art)-1)],(length(ID_Art)-1):1)
+                                               , Source = rev(ID_Art)[sequence((length(ID_Art)-1):1)])
+                                         ,by = New_id2]
+  # remove loop
+  cocitation_edgesf <- cocitation_edgesf[Source!=Target]
+  # counting the number of identical links across citing articles
+  cocitation_edgesf <- cocitation_edgesf[,.N, .(Source,Target)]
+  cocitation_edgesf <- cocitation_edgesf[N>y]
+  # fetching the number of ref per cited document (new_id2)
+  new_id2_w_nb_cit <-  x[,.(nb_cit =.N), ID_Art]
+  # getting the number of ref for all Target
+  cocitation_edgesf <-  merge(cocitation_edgesf,new_id2_w_nb_cit,by.x = "Target",by.y="ID_Art")
+  setnames(cocitation_edgesf,"nb_cit","nb_cit_Target")
+  # getting the number of ref for all Source
+  cocitation_edgesf <-  merge(cocitation_edgesf,new_id2_w_nb_cit,by.x = "Source",by.y="ID_Art")
+  setnames(cocitation_edgesf,"nb_cit","nb_cit_Source")
+  
+  cocitation_edgesf[,weighted_edge := N/sqrt(nb_cit_Target*nb_cit_Source)]
+  colnames(cocitation_edgesf)[colnames(cocitation_edgesf) == "weighted_edge"] <- "Weight"
+  
+  return(cocitation_edgesf) # utilser cette ligne pour sortir un objet.
+}
+
+edges_BE_core_cocit <- coupling_newiD2_edges(coupling_base, 0)
+
+write.csv(edges_BE_core_cocit, file = "Networks/edges_BE_extended_cocit.csv", row.names=FALSE)
+edges_BE_core_cocit[order(Weight)]
+#Getting Nodes
+coupling_newiD2_nodes <- function(x ### x=df of edges
+){
+  bib_coup_nodes <- BE_extended[ID_Art %in% x$Target | ID_Art %in% x$Source, .(ID_Art, Annee_Bibliographique, ESpecialite, Titre, Revue)]
+  colnames(bib_coup_nodes)[colnames(bib_coup_nodes) == "ID_Art"] <- "Id"
+  return(bib_coup_nodes) # utilser cette ligne pour sortir un objet.
+}
+nodes_BE_core_cocit <- cocitation_newiD2_nodes(edges_BE_core_cocit)
+write.csv(nodes_BE_core_cocit, file = "Networks/nodes_BE_extended_cocit.csv", row.names=FALSE)
+
+#per year
+coupling_base[,annee_regrouped := "<1980"]
+coupling_base[Annee_Bibliographique >= 1980 & Annee_Bibliographique < 1990,annee_regrouped := "80-89"]
+coupling_base[Annee_Bibliographique >= 1990 & Annee_Bibliographique < 2000,annee_regrouped := "90-99"]
+coupling_base[Annee_Bibliographique >= 2000 & Annee_Bibliographique < 2010,annee_regrouped := "00-09"]
+coupling_base[Annee_Bibliographique >= 2010 & Annee_Bibliographique < 2020,annee_regrouped := "10-19"]
+BE_extended_70 <- coupling_base[annee_regrouped == "<1980"]
+BE_extended_80 <- coupling_base[annee_regrouped == "80-89"]
+BE_extended_90 <- coupling_base[annee_regrouped == "90-99"]
+BE_extended_00 <- coupling_base[annee_regrouped == "00-09"]
+BE_extended_10 <- coupling_base[annee_regrouped == "10-19"]
+edges_BE_extented_coupling_70 <- coupling_newiD2_edges(BE_extended_70, 3)
+edges_BE_extented_coupling_80 <- coupling_newiD2_edges(BE_extended_80, 3)
+edges_BE_extented_coupling_90 <- coupling_newiD2_edges(BE_extended_90, 5)
+edges_BE_extented_coupling_00 <- coupling_newiD2_edges(BE_extended_00, 10)
+edges_BE_extented_coupling_10 <- coupling_newiD2_edges(BE_extended_10, 10)
+write.csv(edges_BE_extented_coupling_70, file = "Networks/edges_BE_extented_coupling_70.csv", row.names=FALSE)
+write.csv(edges_BE_extented_coupling_80, file = "Networks/edges_BE_extented_coupling_80.csv", row.names=FALSE)
+write.csv(edges_BE_extented_coupling_90, file = "Networks/edges_BE_extented_coupling_90.csv", row.names=FALSE)
+write.csv(edges_BE_extented_coupling_00, file = "Networks/edges_BE_extented_coupling_00.csv", row.names=FALSE)
+write.csv(edges_BE_extented_coupling_10, file = "Networks/edges_BE_extented_coupling_10.csv", row.names=FALSE)
+
+nodes_BE_extended_coupling_70 <- coupling_newiD2_nodes(edges_BE_extented_coupling_70)
+write.csv(nodes_BE_extended_coupling_70, file = "Networks/nodes_BE_extended_coupling_70.csv", row.names=FALSE)
+nodes_BE_extended_coupling_80 <- coupling_newiD2_nodes(edges_BE_extented_coupling_80)
+write.csv(nodes_BE_extended_coupling_80, file = "Networks/nodes_BE_extended_coupling_80.csv", row.names=FALSE)
+nodes_BE_extended_coupling_90 <- coupling_newiD2_nodes(edges_BE_extented_coupling_90)
+write.csv(nodes_BE_extended_coupling_90, file = "Networks/nodes_BE_extended_coupling_90.csv", row.names=FALSE)
+nodes_BE_extended_coupling_00 <- coupling_newiD2_nodes(edges_BE_extented_coupling_00)
+write.csv(nodes_BE_extended_coupling_00, file = "Networks/nodes_BE_extended_coupling_00.csv", row.names=FALSE)
+nodes_BE_extended_coupling_10 <- coupling_newiD2_nodes(edges_BE_extented_coupling_10)
+write.csv(nodes_BE_extended_coupling_10, file = "Networks/nodes_BE_extended_coupling_10.csv", row.names=FALSE)
+
+rm(all_ref_temp)
+gc()
 
 
 
