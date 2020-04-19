@@ -67,20 +67,35 @@ from_xml_to_df <- function(x ### x=df of edges
   macro1 <- macro1[PubType=="Journal Article"]
   return(macro1) # utilser cette ligne pour sortir un objet.
 }
-macro1 <- from_xml_to_df("Econlit/Macro1")
-macro2 <- from_xml_to_df("Econlit/Macro2")
-macro3 <- from_xml_to_df("Econlit/Macro3")
-macro4 <- from_xml_to_df("Econlit/Macro4")
-macro5 <- from_xml_to_df("Econlit/Macro5")
-macro6 <- from_xml_to_df("Econlit/Macro6")
-macro7 <- from_xml_to_df("Econlit/Macro7")
-macro8 <- from_xml_to_df("Econlit/Macro8")
-macro9 <- from_xml_to_df("Econlit/Macro9")
-macro10 <- from_xml_to_df("Econlit/Macro10")
 
-dt_JEL_Articles <- rbind(macro1,macro2,macro3,macro4,macro5,macro6,macro7,macro8,macro9,macro10)
-rm(macro1,macro2,macro3,macro4,macro5,macro6,macro7,macro8,macro9,macro10)
+#Macro
+macro1 <- from_xml_to_df("Econlit/Macro2012/macro1")
+macro2 <- from_xml_to_df("Econlit/Macro2012/macro2")
+macro3 <- from_xml_to_df("Econlit/Macro2012/macro3")
+macro4 <- from_xml_to_df("Econlit/Macro2012/macro4")
+macro5 <- from_xml_to_df("Econlit/Macro2012/macro5")
+macro6 <- from_xml_to_df("Econlit/Macro2012/macro6")
+macro7 <- from_xml_to_df("Econlit/Macro2012/macro7")
+macro8 <- from_xml_to_df("Econlit/Macro2012/macro8")
+dt_JEL_Articles <- rbind(macro1, macro2, macro3, macro4, macro5, macro6, macro7, macro8)
+rm(macro1, macro2, macro3, macro4, macro5, macro6, macro7, macro8)
 gc()
+
+
+#Finance
+#macro1 <- from_xml_to_df("Econlit/Macro1")
+#macro2 <- from_xml_to_df("Econlit/Macro2")
+#macro3 <- from_xml_to_df("Econlit/Macro3")
+#macro4 <- from_xml_to_df("Econlit/Macro4")
+#macro5 <- from_xml_to_df("Econlit/Macro5")
+#macro6 <- from_xml_to_df("Econlit/Macro6")
+#macro7 <- from_xml_to_df("Econlit/Macro7")
+#macro8 <- from_xml_to_df("Econlit/Macro8")
+#macro9 <- from_xml_to_df("Econlit/Macro9")
+#macro10 <- from_xml_to_df("Econlit/Macro10")
+#dt_JEL_Articles <- rbind(macro1,macro2,macro3,macro4,macro5,macro6,macro7,macro8,macro9,macro10)
+#rm(macro1,macro2,macro3,macro4,macro5,macro6,macro7,macro8,macro9,macro10)
+#gc()
 
 ######################### Getting the BD ***************************
 #all ref
@@ -96,7 +111,7 @@ disciplines  <-  dbGetQuery(ESH, "SELECT ESpecialite, Code_Discipline FROM OST_E
 setkey(all_art, ItemID_Ref)
 setkey(all_ref, ItemID_Ref)
 #auteurs
-all_aut <-  dbGetQuery(ESH, paste0("SELECT OST_Expanded_SciHum.Articles.ID_Art, OST_Expanded_SciHum.Articles.Titre, OST_Expanded_SciHum.Articles.Annee_Bibliographique, OST_Expanded_SciHum.Articles.Code_Revue, OST_Expanded_SciHum.Articles.ItemID_Ref, OST_Expanded_SciHum.Auteurs.Nom
+all_aut <-  dbGetQuery(ESH, paste0("SELECT OST_Expanded_SciHum.Articles.ID_Art, OST_Expanded_SciHum.Articles.Titre, OST_Expanded_SciHum.Articles.Annee_Bibliographique, OST_Expanded_SciHum.Articles.Code_Revue, OST_Expanded_SciHum.Articles.ItemID_Ref, OST_Expanded_SciHum.Auteurs.Nom, OST_Expanded_SciHum.Auteurs.Ordre
                                    FROM OST_Expanded_SciHum.Articles
                                    JOIN OST_Expanded_SciHum.Auteurs ON OST_Expanded_SciHum.Articles.ID_Art=OST_Expanded_SciHum.Auteurs.ID_Art")) %>%  data.table
 
@@ -160,7 +175,7 @@ gc()
 BE_ref <- merge(BE[,.(ID_Art, ItemID_Ref_source = ItemID_Ref, Titre, Annee_Bibliographique, Code_Revue)], all_ref[,.(ID_Art, ItemID_Ref_target = ItemID_Ref)], by="ID_Art")
 
 #Find articles that are at least referenced N times
-BE_ref <- BE_ref[,.(.N), by = "ItemID_Ref_target"][order(N)][N>5]
+BE_ref <- BE_ref[,.(.N), by = "ItemID_Ref_target"][order(N)][N>=5]
 setkey(BE_ref, ItemID_Ref_target)
 setkey(all_art, ItemID_Ref)
 
@@ -177,10 +192,10 @@ citations_to_core <- all_ref[ItemID_Ref %in% BE_core$ItemID_Ref]
 references_of_core <- all_ref[ID_Art %in% BE_core$ID_Art]
 
 ######################### info about citations to ***************************
-BE_core_extended_citations <- citations_to_core[,.(number_of_articles_cited_in_core = .N), ID_Art][order(number_of_articles_cited_in_core)][number_of_articles_cited_in_core>10]
+BE_core_extended_citations <- citations_to_core[,.(number_of_articles_cited_in_core = .N), ID_Art][order(number_of_articles_cited_in_core)][number_of_articles_cited_in_core>=5]
 
 ######################### info about references ***************************
-BE_core_extended_references <- references_of_core[,.(number_of_citations_by_core = .N), ItemID_Ref][order(number_of_citations_by_core)][number_of_citations_by_core>10]
+BE_core_extended_references <- references_of_core[,.(number_of_citations_by_core = .N), ItemID_Ref][order(number_of_citations_by_core)][number_of_citations_by_core>=5]
 #replacing ItemID_Ref by ID_Art
 BE_core_extended_references <- merge(BE_core_extended_references, all_art[,.(ID_Art, ItemID_Ref)], by = "ItemID_Ref")
 BE_core_extended_references <- BE_core_extended_references[,.(ID_Art, number_of_citations_by_core)]
@@ -200,6 +215,13 @@ BE_extended[,.(.N), by = "core"][order(N)]
 BE_extended <- merge(BE_extended, all_art[,.(ID_Art, ItemID_Ref, Titre, Annee_Bibliographique, Code_Revue)], by = "ID_Art")
 BE_extended <- merge(BE_extended, revues, by = "Code_Revue", all = FALSE)
 BE_extended <- merge(BE_extended, disciplines[,.(Code_Discipline, ESpecialite)], by = "Code_Discipline", all = FALSE)
+
+#getting autor-year (88982)
+BE_extended <- merge(BE_extended, all_aut[Ordre==1,.(ID_Art, Nom)], by = "ID_Art", all.x = TRUE, all.y = FALSE)
+BE_extended <- BE_extended[, name_short:= paste0(unlist(strsplit(Nom,"-"))[1],"-", substr(unlist(strsplit(Nom,"-"))[2],1,1) 
+), by=list(ID_Art,Nom)]
+BE_extended$name_short <- toupper(BE_extended$name_short)
+BE_extended <- BE_extended[,Label:=paste0(name_short,",",Annee_Bibliographique)]
 
 #grouping disciplines
 BE_extended[,ESpecialite_grouped := "Other"]; BE_extended[ESpecialite %in% list_discipline$disciplines, ESpecialite_grouped := ESpecialite]
@@ -268,8 +290,7 @@ corpus_core6 <- ggplot(authors_of_core[,.(sum=sum(citations_by_JEL)), name_short
 
 plot1 <- (corpus_core1 + corpus_core2) / corpus_core3
 plot2 <- (corpus_core6 + corpus_core5) / corpus_core4
-saveRDS(plot1, file = "Plots/plot1.RDS")
-saveRDS(plot2, file = "Plots/plot2.RDS")
+
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #### ggplot Extended_CORE####
@@ -314,9 +335,6 @@ corpus_extended_core5 <- ggplot(authors_of_extended_core[,.(.N), name_short][ord
 plot3 <- (corpus_extended_core1 + corpus_extended_core2) / corpus_extended_core3
 plot4 <- (corpus_core6 + corpus_core5) / corpus_core4
 
-saveRDS(plot3, file = "Plots/plot3.RDS")
-saveRDS(plot4, file = "Plots/plot4.RDS")
-
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
@@ -358,14 +376,19 @@ setkey(BE_core_extended_autocit, ID_Art_Source)
 #### Edges %%%%
 edge_BE_core_extended_autocit <- BE_core_extended_autocit[,.(ID_Art_Source,ID_Art_Target)]
 #### Nodes %%%%
-node_BE_core_extended_autocit<- merge(BE_extended[,.(ID_Art, Titre, Annee_Bibliographique, Code_Revue, core)], revues[,.(Code_Revue, Code_Discipline)], by="Code_Revue")
-node_BE_core_extended_autocit <- merge(node_BE_core_extended_autocit[,.(ID_Art, Titre, Annee_Bibliographique, Code_Revue, Code_Discipline)], disciplines[,.(ESpecialite, Code_Discipline)], by="Code_Discipline")
-node_BE_core_extended_autocit <- node_BE_core_extended_autocit[,.(Id = ID_Art, Titre, Annee_Bibliographique, ESpecialite)]
+node_BE_core_extended_autocit<- merge(BE_extended[,.(ID_Art, Titre, Annee_Bibliographique, Code_Revue, core, Label)], revues[,.(Code_Revue, Code_Discipline)], by="Code_Revue")
+node_BE_core_extended_autocit <- merge(node_BE_core_extended_autocit[,.(ID_Art, Titre, Annee_Bibliographique, Code_Revue, Code_Discipline, Label)], disciplines[,.(ESpecialite, Code_Discipline)], by="Code_Discipline")
+node_BE_core_extended_autocit <- node_BE_core_extended_autocit[,.(Id = ID_Art, Titre, Annee_Bibliographique, ESpecialite, Label)]
 node_BE_core_extended_autocit[,ESpecialite_grouped := "Other"]; node_BE_core_extended_autocit[ESpecialite %in% list_discipline$disciplines, ESpecialite_grouped := ESpecialite]
 
 write.csv(edge_BE_core_extended_autocit, file = "Networks/edges_BE_extended_core_autocit.csv", row.names=FALSE)
 write.csv(node_BE_core_extended_autocit, file = "Networks/nodes_BE_extended_core_autocit.csv", row.names=FALSE)
 
+#### indegree %%%%
+nb_citations <- edge_BE_core_extended_autocit[,nb_cit_indegree:=.N, ID_Art_Target][,.(ID_Art=ID_Art_Target, nb_cit_indegree)]
+nb_citations <- unique(nb_citations)
+BE_extended <- merge(BE_extended, nb_citations, by="ID_Art", all=TRUE)
+BE_extended <- BE_extended[is.na(nb_cit_indegree), nb_cit_indegree:=0]
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #### CoCitation ####
@@ -411,9 +434,9 @@ cocitation_newiD2_edges <- function(x, y ### x=df of corpus, y=minimum number of
   
   return(cocitation_edgesf) # utilser cette ligne pour sortir un objet.
 }
-edges_BE_core_cocit <- cocitation_newiD2_edges(cocitation_base, 10)
+#edges_BE_core_cocit <- cocitation_newiD2_edges(cocitation_base, 10)
 
-write.csv(edges_BE_core_cocit, file = "Networks/edges_BE_extended_cocit.csv", row.names=FALSE)
+#write.csv(edges_BE_core_cocit, file = "Networks/edges_BE_extended_cocit.csv", row.names=FALSE)
 edges_BE_core_cocit[order(Weight)]
 #Getting Nodes
 cocitation_newiD2_nodes <- function(x ### x=df of edges
@@ -428,16 +451,17 @@ cocitation_newiD2_nodes <- function(x ### x=df of edges
   bib_coup_nodes <- bib_coup_nodes[,Label:=paste0(Nom_mode,",",Annee_mode)]
   return(bib_coup_nodes) # utilser cette ligne pour sortir un objet.
 }
-nodes_BE_core_cocit <- cocitation_newiD2_nodes(edges_BE_core_cocit)
-write.csv(nodes_BE_core_cocit, file = "Networks/nodes_BE_extended_cocit.csv", row.names=FALSE)
+#nodes_BE_core_cocit <- cocitation_newiD2_nodes(edges_BE_core_cocit)
+#write.csv(nodes_BE_core_cocit, file = "Networks/nodes_BE_extended_cocit.csv", row.names=FALSE)
 
 #per year
-cocitation_base[,annee_regrouped := "<1980"]
+cocitation_base[,annee_regrouped := "<1970"]
+cocitation_base[Annee_Bibliographique >= 1970 & Annee_Bibliographique < 1980,annee_regrouped := "70-79"]
 cocitation_base[Annee_Bibliographique >= 1980 & Annee_Bibliographique < 1990,annee_regrouped := "80-89"]
 cocitation_base[Annee_Bibliographique >= 1990 & Annee_Bibliographique < 2000,annee_regrouped := "90-99"]
 cocitation_base[Annee_Bibliographique >= 2000 & Annee_Bibliographique < 2010,annee_regrouped := "00-09"]
 cocitation_base[Annee_Bibliographique >= 2010 & Annee_Bibliographique < 2020,annee_regrouped := "10-19"]
-BE_extended_70 <- cocitation_base[annee_regrouped == "<1980"]
+BE_extended_70 <- cocitation_base[annee_regrouped == "70-79"]
 BE_extended_80 <- cocitation_base[annee_regrouped == "80-89"]
 BE_extended_90 <- cocitation_base[annee_regrouped == "90-99"]
 BE_extended_00 <- cocitation_base[annee_regrouped == "00-09"]
@@ -453,28 +477,38 @@ write.csv(edges_BE_extented_cocit_90, file = "Networks/edges_BE_extended_cocit_9
 write.csv(edges_BE_extented_cocit_00, file = "Networks/edges_BE_extended_cocit_00.csv", row.names=FALSE)
 write.csv(edges_BE_extented_cocit_10, file = "Networks/edges_BE_extended_cocit_10.csv", row.names=FALSE)
 
+#nodes + nb cit
+n_cit <- function(x, y ### x=df of corpus, y=minimum number of connections
+){
+  n_cit_source <- y[,.(Id = Source, nb_cit = nb_cit_Source)]
+  n_cit_target <- y[,.(Id = Target, nb_cit = nb_cit_Target)]
+  n_cit <- rbind(n_cit_source, n_cit_target)
+  n_cit <- n_cit[, head(.SD, 1), Id]
+  n_cit_final <-merge(x, n_cit, by = "Id")
+  return(n_cit_final) # utilser cette ligne pour sortir un objet.
+}
+
 nodes_BE_core_cocit_70 <- cocitation_newiD2_nodes(edges_BE_extented_cocit_70)
+nodes_BE_core_cocit_70 <- n_cit(nodes_BE_core_cocit_70, edges_BE_extented_cocit_70)
 write.csv(nodes_BE_core_cocit_70, file = "Networks/nodes_BE_extended_cocit_70.csv", row.names=FALSE)
 nodes_BE_core_cocit_80 <- cocitation_newiD2_nodes(edges_BE_extented_cocit_80)
+nodes_BE_core_cocit_80 <- n_cit(nodes_BE_core_cocit_80, edges_BE_extented_cocit_80)
 write.csv(nodes_BE_core_cocit_80, file = "Networks/nodes_BE_extended_cocit_80.csv", row.names=FALSE)
 nodes_BE_core_cocit_90 <- cocitation_newiD2_nodes(edges_BE_extented_cocit_90)
+nodes_BE_core_cocit_90 <- n_cit(nodes_BE_core_cocit_90, edges_BE_extented_cocit_90)
 write.csv(nodes_BE_core_cocit_90, file = "Networks/nodes_BE_extended_cocit_90.csv", row.names=FALSE)
 nodes_BE_core_cocit_00 <- cocitation_newiD2_nodes(edges_BE_extented_cocit_00)
+nodes_BE_core_cocit_00 <- n_cit(nodes_BE_core_cocit_00, edges_BE_extented_cocit_00)
 write.csv(nodes_BE_core_cocit_00, file = "Networks/nodes_BE_extended_cocit_00.csv", row.names=FALSE)
 nodes_BE_core_cocit_10 <- cocitation_newiD2_nodes(edges_BE_extented_cocit_10)
+nodes_BE_core_cocit_10 <- n_cit(nodes_BE_core_cocit_10, edges_BE_extented_cocit_10)
 write.csv(nodes_BE_core_cocit_10, file = "Networks/nodes_BE_extended_cocit_10.csv", row.names=FALSE)
-
-rm(all_ref_temp)
-gc()
 
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #### Coupling ####
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-all_ref_temp <-  dbGetQuery(ESH, paste0("SELECT Annee, Nom, ID_Art, New_id2 
-                                        FROM OST_Expanded_SciHum.References7 WHERE New_id2!=0;")) %>%  data.table
-
 
 ######################### Coupling it (in progress) ***************************
 coupling_base <- all_ref_temp[ID_Art %in% BE_extended$ID_Art] %>%  data.table
@@ -506,7 +540,7 @@ coupling_newiD2_edges <- function(x, y ### x=df of corpus, y=minimum number of c
   cocitation_edgesf <- cocitation_edgesf[Source!=Target]
   # counting the number of identical links across citing articles
   cocitation_edgesf <- cocitation_edgesf[,.N, .(Source,Target)]
-  cocitation_edgesf <- cocitation_edgesf[N>y]
+  cocitation_edgesf <- cocitation_edgesf[N>=y]
   # fetching the number of ref per cited document (new_id2)
   new_id2_w_nb_cit <-  x[,.(nb_cit =.N), ID_Art]
   # getting the number of ref for all Target
@@ -522,27 +556,28 @@ coupling_newiD2_edges <- function(x, y ### x=df of corpus, y=minimum number of c
   return(cocitation_edgesf) # utilser cette ligne pour sortir un objet.
 }
 
-edges_BE_core_cocit <- coupling_newiD2_edges(coupling_base, 0)
+#edges_BE_core_cocit <- coupling_newiD2_edges(coupling_base, 20)
 
-write.csv(edges_BE_core_cocit, file = "Networks/edges_BE_extended_cocit.csv", row.names=FALSE)
+#write.csv(edges_BE_core_cocit, file = "Networks/edges_BE_extended_cocit.csv", row.names=FALSE)
 edges_BE_core_cocit[order(Weight)]
 #Getting Nodes
 coupling_newiD2_nodes <- function(x ### x=df of edges
 ){
-  bib_coup_nodes <- BE_extended[ID_Art %in% x$Target | ID_Art %in% x$Source, .(ID_Art, Annee_Bibliographique, ESpecialite, Titre, Revue)]
+  bib_coup_nodes <- BE_extended[ID_Art %in% x$Target | ID_Art %in% x$Source, .(ID_Art, Annee_Bibliographique, ESpecialite, Titre, Revue, Label, nb_cit_indegree)]
   colnames(bib_coup_nodes)[colnames(bib_coup_nodes) == "ID_Art"] <- "Id"
   return(bib_coup_nodes) # utilser cette ligne pour sortir un objet.
 }
-nodes_BE_core_cocit <- cocitation_newiD2_nodes(edges_BE_core_cocit)
-write.csv(nodes_BE_core_cocit, file = "Networks/nodes_BE_extended_cocit.csv", row.names=FALSE)
+#nodes_BE_core_cocit <- cocitation_newiD2_nodes(edges_BE_core_cocit)
+#write.csv(nodes_BE_core_cocit, file = "Networks/nodes_BE_extended_cocit.csv", row.names=FALSE)
 
 #per year
-coupling_base[,annee_regrouped := "<1980"]
+coupling_base[,annee_regrouped := "<1970"]
+coupling_base[Annee_Bibliographique >= 1970 & Annee_Bibliographique < 1980,annee_regrouped := "70-79"]
 coupling_base[Annee_Bibliographique >= 1980 & Annee_Bibliographique < 1990,annee_regrouped := "80-89"]
 coupling_base[Annee_Bibliographique >= 1990 & Annee_Bibliographique < 2000,annee_regrouped := "90-99"]
 coupling_base[Annee_Bibliographique >= 2000 & Annee_Bibliographique < 2010,annee_regrouped := "00-09"]
 coupling_base[Annee_Bibliographique >= 2010 & Annee_Bibliographique < 2020,annee_regrouped := "10-19"]
-BE_extended_70 <- coupling_base[annee_regrouped == "<1980"]
+BE_extended_70 <- coupling_base[annee_regrouped == "70-79"]
 BE_extended_80 <- coupling_base[annee_regrouped == "80-89"]
 BE_extended_90 <- coupling_base[annee_regrouped == "90-99"]
 BE_extended_00 <- coupling_base[annee_regrouped == "00-09"]
