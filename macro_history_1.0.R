@@ -17,8 +17,7 @@ library(KDViz)
 library(xml2)
 require(patchwork)
 
-pswd = 'alex55Truc!1epistemo'
-usr = 'alexandre'
+
 ESH <- dbConnect(MySQL(), user=usr, password=pswd, dbname='OST_Expanded_SciHum',
                  host='127.0.0.1')
 
